@@ -26,11 +26,6 @@ export function storeDir(): string {
   return join(fHome(), "ucks");
 }
 
-/** Legacy location for clones from an earlier two-tree cut of this design. */
-export function repoStoreDir(): string {
-  return join(fHome(), "uck-repos");
-}
-
 /** A git clone installed as a bucket, plus the bucket name it provides. */
 export interface StoredRepo {
   bucket: string;
@@ -222,10 +217,10 @@ export function nameAllowed(name: string, f: { only?: string[]; except?: string[
  * Download a source into the store. Idempotent by default (skip if already
  * present) unless force=true (f up).
  *
- * - git source: CLONE into ~/.f/uck-repos/<bucket> and keep it. `f up` is fetch
- *   + reset --hard + submodule update, so an installed source is a real checkout
- *   you can `git log` / `git diff` / `git blame`, and updating no longer
- *   re-downloads the world.
+ * - git source: CLONE into ~/.f/ucks/<bucket> and keep it — the bucket IS the
+ *   clone. `f up` is fetch + reset --hard + submodule update, so an installed
+ *   source is a real checkout you can `git log` / `git diff` / `git blame`, and
+ *   updating no longer re-downloads the world.
  * - local source: copy it in (a local source is already a checkout you edit).
  * - npm sources resolve from node_modules at load time; nothing to install.
  */
@@ -249,8 +244,7 @@ export async function installSource(src: UckSource, force = false): Promise<bool
 }
 
 /**
- * Install/refresh a git source as a persistent clone at
- * ~/.f/uck-repos/<bucket>/.
+ * Install/refresh a git source as the bucket itself at ~/.f/ucks/<bucket>/.
  *
  * `force` (f up) is fetch + `git reset --hard <upstream>`: the clone is a cache
  * of the remote, never an editing surface, so local edits get discarded rather
@@ -301,7 +295,6 @@ function installGitSource(
     writeManifest(dir, specifier, url, ref, filters);
     ensureModuleMarkers(dir);
     installDepsInTree(dir);
-    retireSideTree(bucket);
     discardStashes(backup);
     console.error(`f: cloned ${bucket} → ${dir}`);
     return true;
@@ -343,7 +336,6 @@ function installGitSource(
   writeManifest(dir, specifier, url, ref, filters);
   ensureModuleMarkers(dir);
   installDepsInTree(dir);
-  if (force) retireSideTree(bucket);
   return true;
 }
 
@@ -532,28 +524,6 @@ function restoreStash(dir: string, stashes: string[]): void {
   }
 }
 
-/**
- * Retire the leftover of the two-tree cut of this design, where clones lived at
- * ~/.f/uck-repos/<bucket>. The bucket *is* the clone now, so that copy is
- * strictly redundant — installGitSource has just cloned this bucket into
- * ~/.f/ucks/<bucket> in order to get here. Nothing is renamed out of
- * ~/.f/uck-repos: renaming onto the bucket path would collide with the clone
- * made moments ago and fail silently, which is what an earlier version of this
- * function did (and why the side tree never went away).
- *
- * The pre-clone copy of the bucket needs no handling here -- stashExisting moved
- * it aside and discardStashes deletes it once the clone is verified.
- */
-function retireSideTree(bucket: string): void {
-  const legacyRepo = join(repoStoreDir(), bucket);
-  if (existsSync(legacyRepo)) {
-    rmSync(legacyRepo, { recursive: true, force: true });
-    console.error(`f: ${bucket}: removed redundant ${repoStoreDir()}/${bucket}`);
-  }
-  if (existsSync(repoStoreDir()) && !readdirSync(repoStoreDir()).length) {
-    rmSync(repoStoreDir(), { recursive: true, force: true });
-  }
-}
 
 /** The clone works; the copy it replaced is now just a stale second checkout. */
 function discardStashes(stashes: string[]): void {

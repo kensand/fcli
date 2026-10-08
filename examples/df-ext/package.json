@@ -1,0 +1,10 @@
+{
+  "name": "@fcli/df",
+  "version": "0.1.0",
+  "description": "f extension: disk free (terse)",
+  "type": "module",
+  "main": "./index.js",
+  "exports": "./index.js",
+  "keywords": ["f-extension"],
+  "license": "MIT"
+}

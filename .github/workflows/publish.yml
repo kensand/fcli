@@ -1,0 +1,74 @@
+name: publish
+
+# Publishes fcli to npm when a v* tag is pushed, using npm TRUSTED PUBLISHING
+# (OIDC). No NPM_TOKEN secret is needed or stored.
+#
+# One-time npm-side setup (do this before the first tag):
+#   1. https://www.npmjs.com  ->  Access Tokens -> Trusted Publishers
+#   2. "Add trusted publisher":
+#        Provider:       GitHub
+#        GitHub owner:   kensand
+#        Repository:     fcli
+#        Environment:    npm
+#   3. Approve. Only this workflow (from that repo + environment) may now
+#      publish `fcli`.
+#
+# The "Environment" value above MUST equal the `environment:` in this file.
+#
+# https://docs.npmjs.com/trusted-publishers
+# https://github.blog/changelog/2025-07-31-npm-trusted-publishing-with-oidc-is-generally-available/
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# id-token: write lets GitHub Actions mint the OIDC token that npm verifies.
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Must match the "Environment" chosen when adding the trusted publisher on
+    # npm. Also gives you an optional approval gate (Environments -> npm).
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      # Fail fast if the tag doesn't match package.json, so we never publish a
+      # version that disagrees with what's in the repo.
+      - name: Verify tag matches package version
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          tag=${GITHUB_REF_NAME#v}
+          echo "package.json version: $pkg"
+          echo "tag version:          $tag"
+          if [ "$pkg" != "$tag" ]; then
+            echo "::error::tag v$tag does not match package.json version $pkg"
+            exit 1
+          fi
+
+      - name: Install deps (prepare builds dist/)
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify the built package
+        run: |
+          test -f dist/index.js || \
+            { echo "dist/index.js missing after build"; exit 1; }
+          node dist/index.js v
+
+      # No NODE_AUTH_TOKEN: npm uses the GHA OIDC token (from id-token: write)
+      # and authorizes it against the trusted publisher registered for this
+      # repo + the "npm" environment + the fcli package.
+      - name: Publish to npm (trusted publishing)
+        run: npm publish

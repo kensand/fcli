@@ -6,7 +6,7 @@ import { ensureGlobalConfig, allSources } from "./config.js";
 import { installSource, installedUcks } from "./store.js";
 import { updateAll } from "./update.js";
 import { help } from "./help.js";
-import { type Uck } from "./types.js";
+import { type Uck, type UckRunContext } from "./types.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -53,16 +53,14 @@ export async function run(argv: string[]): Promise<void> {
 
   // Load ucks: from the store, then from any npm sources in node_modules.
   const ucks: Record<string, Uck> = {};
-  const uckList: { name: string; desc: string }[] = [];
 
   for (const u of await loadStoreUcks(fVersion)) {
     ucks[u.name] = u;
-    uckList.push({ name: u.name, desc: u.desc });
   }
   for (const src of allSources()) {
     const specifier = typeof src === "string" ? src : src.source;
     if (specifierIsGit(specifier) || looksLocal(specifier)) continue;
-    for (const u of await loadFromNodeModules(specifier, fVersion, uckList)) {
+    for (const u of await loadFromNodeModules(specifier, fVersion)) {
       ucks[u.name] = u; // later (project) sources override store/builtins
     }
   }
@@ -86,7 +84,9 @@ export async function run(argv: string[]): Promise<void> {
   }
 
   try {
-    await uck.run(rest, uck.argv?.(rest) ?? { _: rest });
+    const uckList = Object.values(ucks).map((u) => ({ name: u.name, desc: u.desc }));
+    const ctx: UckRunContext = { fVersion, ucks: uckList, self: name, registry: ucks };
+    await uck.run(rest, uck.argv?.(rest) ?? { _: rest }, ctx);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`f: ${msg}`);

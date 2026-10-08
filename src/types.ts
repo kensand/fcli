@@ -7,18 +7,30 @@ export interface UckArgs {
 export interface Uck {
   name: string;
   desc: string;
-  run: (argv: string[], args: UckArgs) => void | Promise<void>;
+  run: (argv: string[], args: UckArgs, ctx: UckRunContext) => void | Promise<void>;
   argv?: (argv: string[]) => UckArgs;
+  /** Ucks may export anything else they want; core ignores unknown fields. */
+  [key: string]: unknown;
 }
 
-/** Context passed to every uck's register function */
+/** Context passed to a uck's register() — load time, before any ucks exist. */
 export interface UckContext {
   /** f's own version string */
   fVersion: string;
-  /** All ucks registered so far (store + previously loaded) */
-  ucks: { name: string; desc: string }[];
   /** This uck's name */
   self: string;
+}
+
+/**
+ * Context passed to a uck's run() — after every uck is loaded. A uck can
+ * read any field (e.g. `skills`) exported by other ucks off the registry.
+ * Core imposes no restrictions on what a uck exports.
+ */
+export interface UckRunContext extends UckContext {
+  /** name + desc of every uck (store + npm sources). */
+  ucks: { name: string; desc: string }[];
+  /** name -> the complete object a uck returned from register(). */
+  registry: Record<string, Uck>;
 }
 
 /** What a uck module (index.js) exports */

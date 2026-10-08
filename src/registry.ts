@@ -34,14 +34,13 @@ function toImportUrl(entry: string): string {
 export async function loadStoreUcks(fVersion: string): Promise<Uck[]> {
   const ucks = resolvedUcks();
   const results: Uck[] = [];
-  const uckList: { name: string; desc: string }[] = [];
 
   for (const name of Object.keys(ucks).sort()) {
     const dir = ucks[name].dir;
     const indexPath = join(dir, "index.js");
     if (!existsSync(indexPath)) continue;
 
-    const results2 = await loadUckModule(indexPath, name, fVersion, uckList);
+    const results2 = await loadUckModule(indexPath, name, fVersion);
     results.push(...results2);
   }
 
@@ -52,8 +51,7 @@ export async function loadStoreUcks(fVersion: string): Promise<Uck[]> {
 async function loadUckModule(
   indexPath: string,
   self: string,
-  fVersion: string,
-  uckList: { name: string; desc: string }[]
+  fVersion: string
 ): Promise<Uck[]> {
   let mod: UckModule;
   try {
@@ -69,7 +67,7 @@ async function loadUckModule(
     return [];
   }
 
-  const ctx: UckContext = { fVersion, ucks: uckList, self };
+  const ctx: UckContext = { fVersion, self };
   let newUcks: Uck[] | Uck;
   try {
     newUcks = mod.register(ctx);
@@ -84,7 +82,6 @@ async function loadUckModule(
   for (const u of newUcks) {
     if (!u.name || typeof u.run !== "function") continue;
     out.push(u);
-    uckList.push({ name: u.name, desc: u.desc ?? "" });
   }
   return out;
 }
@@ -93,7 +90,7 @@ async function loadUckModule(
  * Load ucks from an npm/git source that is already installed in node_modules
  * (not in the store). Used for sources that resolve via the package system.
  */
-async function loadFromNodeModules(specifier: string, fVersion: string, uckList: { name: string; desc: string }[]): Promise<Uck[]> {
+async function loadFromNodeModules(specifier: string, fVersion: string): Promise<Uck[]> {
   let resolved: string;
   try {
     resolved = require.resolve(specifier);
@@ -102,7 +99,7 @@ async function loadFromNodeModules(specifier: string, fVersion: string, uckList:
     return [];
   }
   const name = specifier.includes("/") ? specifier.split("/").pop()! : specifier;
-  return loadUckModule(resolved, name, fVersion, uckList);
+  return loadUckModule(resolved, name, fVersion);
 }
 
 export { loadFromNodeModules };

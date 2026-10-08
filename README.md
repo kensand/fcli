@@ -77,7 +77,7 @@ f creds lock                            # stop daemon, zeroize key
 - **Lock** (or TTL expiry) kills the daemon and removes the socket; the encrypted store on disk is untouched.
 - Other ucks can drive it via the exported `credsApi` (`get`/`set`/`ls`/`unlock`/`lock`/`status`).
 
-**`f uck`** pushes ucks from the store to a git repo. Because the store is nested (`~/.f/ucks/<bucket>/<name>/`), the **bucket name is the link**: a push target named `mine` mirrors everything under `~/.f/ucks/mine/`.
+**`f uck`** pushes ucks from the store to a git repo. A **bucket is a source** (`~/.f/ucks/<bucket>/`), so the **bucket name is the link**: a push target named `mine` mirrors the ucks in `~/.f/ucks/mine/`.
 
 ```bash
 f uck repo add mine https://…/me/my-ucks.git [--ref main]  # register a push target
@@ -89,14 +89,15 @@ f uck push greet ls -r mine                              # push only these ucks
 
 - **Push model (v1):** clone the target (shallow), overwrite the named uck dirs from the store, commit, `git push` (fast-forward only, never `--force`). `node_modules` is never pushed. **The store wins per uck** — the store's copy replaces the repo's.
 - **Auth** is delegated to `git` (your ssh keys / credential helper).
-- **Pull is not re-implemented:** to pull, add the repo as a source in `f.config.json` (give it a matching `name` so the bucket lines up) and run `f up`.
+- **Pull:** add the repo as a source in `f.config.json` (give it a matching `name` so the bucket lines up) and run `f up` — that is a `git fetch` + reset of the bucket.
 - Other ucks can drive it via the exported `uckApi` (`loadTargets`/`saveTargets`/`push`/`bucketUcks`).
 
 ## The store
 
-Every uck f knows about lives in **`~/.f/ucks/<bucket>/<name>/index.js`** (plus any supporting files). `f` loads every `~/.f/ucks/*/*/index.js`.
+Every uck f knows about lives under **`~/.f/ucks/<bucket>/`**. `<bucket>` is the source the uck came from — the repo basename (git), path basename (local), or an explicit `name` on the source — so the store keeps provenance **by construction**: the path tells you where each uck came from.
 
-- **`<bucket>`** is the source the uck came from — the repo basename (git), path basename (local), or an explicit `name` on the source. The store keeps provenance **by construction**: the path tells you where each uck came from.
+- **A git bucket is the clone of that repo**, `.git/` and all. `f up` is `git fetch` + `git reset --hard`, not a re-download, so you can `git log`, `git diff`, and `git blame` an installed uck. It also means the bucket is a cache: anything you edit in place gets reset, so edit elsewhere and send it with `f uck push`.
+- **A local bucket is a copy** of the path you added.
 - **First install** seeds `~/.f/f.config.json` with the defaults repo, then downloads each configured source into the store (only if not already present).
 - **Normal runs** just load the store — instant, no network.
 - **`f up`** forces re-download.
@@ -184,7 +185,7 @@ export default { register };
 
 f copies it into `~/.f/ucks/ls/` and it's available. Return an array from `register()` to add multiple ucks from one module.
 
-**As a repo** — put uck dirs in a git repo (`v/index.js`, `w/index.js`, …) and add the repo URL to `f.config.json`. f downloads it and installs every uck dir inside.
+**As a repo** — put uck dirs in a git repo (`v/index.js`, `w/index.js`, …) and add the repo URL to `f.config.json`. f clones it into `~/.f/ucks/<repo>/` and loads every uck dir inside it, at any depth.
 
 ## Extending f (as npm packages)
 

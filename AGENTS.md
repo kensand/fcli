@@ -34,7 +34,7 @@ src/index.ts      # entry: import { run } from "./cli.js"; run(process.argv.slic
 src/cli.ts        # run(): seed config, populate store, load ucks, dispatch
 src/types.ts      # Uck, UckContext, UckModule, UckSource, FConfig (the contracts)
 src/config.ts     # DEFAULTS_REPO, global/project f.config.json read+merge
-src/store.ts      # ~/.f/ucks/<bucket>/<name>/ install + shadowing
+src/store.ts      # ~/.f/ucks/<bucket>/ install (a git bucket IS its clone) + shadowing
 src/registry.ts   # load uck modules (store + node_modules), call register()
 src/help.ts       # f help output
 src/update.ts     # f up: force re-fetch all sources
@@ -67,10 +67,23 @@ console error, not fatal.
 ## Key invariants — don't break these
 
 1. **Nested store, provenance by construction.** The store is
-   `~/.f/ucks/<bucket>/<name>/index.js`. `<bucket>` is the *source* name: the
-   repo basename for git, path basename for local, or an explicit `name` on the
-   source object. The path tells you where each uck came from. `sourceBucket()`
-   in `store.ts` is the single source of truth for this.
+   `~/.f/ucks/<bucket>/`. `<bucket>` is the *source* name: the repo basename for
+   git, path basename for local, or an explicit `name` on the source object. The
+   path tells you where each uck came from. `sourceBucket()` in `store.ts` is the
+   single source of truth for this.
+
+   **For a git source the bucket directory is the clone itself** — it contains
+   `.git/` and the repo's own layout, not a flattened pile of uck dirs. So a uck
+   lives at `~/.f/ucks/<bucket>/<path inside the repo>/index.js` at any depth,
+   and `findUckDirs()` walks the working tree to find them. A bucket with no
+   `.git` is a local source (or a pre-clone leftover) and keeps the older
+   one-level rule: `~/.f/ucks/<bucket>/<name>/index.js`.
+
+   This replaced a copy model that stored a repo's *contents* loose in the bucket
+   directory. That lost the repo: it had no `.git` (so no history, no `origin`,
+   and `f up` had to re-download), it could not hold a root-level uck or one
+   nested deeper than one level, and a `.gitmodules` entry arrived as an inert
+   file with an empty directory where the uck should be.
 
 2. **Shadowing: later source wins.** `resolvedUcks()` applies shadowing — if
    two buckets define the same uck name, the later one (project config after
@@ -102,6 +115,26 @@ Classification (`sourceKind` in registry.ts): local path → `local`,
 **Populate-on-first-run:** a normal `f <uck>` run installs *git* sources only
 when the store is empty; local sources always install; npm sources load from
 node_modules. `f up` force-refetches everything.
+
+**A git bucket is a cache, not a workspace.** `f up` runs `git fetch` +
+`git reset --hard <upstream>` + `git clean -fdx -e node_modules` +
+`git submodule update --init --recursive` in it, so edits made inside
+`~/.f/ucks/<bucket>/` are discarded, exactly as the copy model's `rm -rf` did.
+Do uck work in a clone you made yourself, or edit the store and send it with
+`f uck push` — never expect `f up` to preserve a change. Two consequences of the
+bucket being a working tree rather than a content dump:
+
+- **`node_modules` is installed per uck after cloning** (the source repo
+  gitignores it, so a clone never carries it). `installDepsInTree()` runs `npm i`
+  in each uck dir that has a `package.json` and no `node_modules`.
+- **ESM ucks get a `package.json` with `"type": "module"` written into them**
+  (`ensureModuleMarkers()`). `import()` decides a file's module type from the
+  nearest `package.json`, and in the copy store each uck dir was self-contained;
+  in a clone, a uck with no `package.json` and none at the repo root resolves as
+  CommonJS and dies at load with "Cannot use import statement outside a module"
+  — which surfaces as a per-uck warning and a missing command. The marker is
+  untracked, so `git clean` deletes it and the pass must run after every reset,
+  not only after a clone.
 
 ## Repo topology (where things live)
 

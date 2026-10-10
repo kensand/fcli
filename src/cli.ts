@@ -73,7 +73,10 @@ export async function run(argv: string[]): Promise<void> {
   }
 
   if (name === "up") {
-    await updateAll();
+    // --force discards dirty git buckets after one confirmation; without it
+    // dirty buckets are skipped and preserved (see updateAll).
+    const force = rest.includes("--force") || rest.includes("-f");
+    await updateAll({ force });
     return;
   }
 

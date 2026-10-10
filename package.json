@@ -1,6 +1,6 @@
 {
   "name": "@fcli.dev/f",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Token-efficient CLI for LLMs to extend and use",
   "type": "module",
   "bin": {

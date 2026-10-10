@@ -39,7 +39,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Node 22.14+ / npm 11.5.1+ are REQUIRED for npm OIDC trusted
+          # publishing. Node 20 ships npm 10, which cannot do OIDC publish and
+          # fails with a misleading E404. Node 24 is current LTS and bundles
+          # npm 11.x.
+          node-version: 24
+          cache: npm
           registry-url: https://registry.npmjs.org
 
       # Fail fast if the tag doesn't match package.json, so we never publish a

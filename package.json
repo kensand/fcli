@@ -1,10 +1,10 @@
 {
   "name": "@fcli.dev/f",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Token-efficient CLI for LLMs to extend and use",
   "type": "module",
   "bin": {
-    "f": "./dist/index.js"
+    "f": "dist/index.js"
   },
   "main": "./dist/index.js",
   "files": [
@@ -14,7 +14,7 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.14.0"
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm --out-dir dist",
@@ -33,7 +33,10 @@
   "license": "AGPL-3.0",
   "repository": {
     "type": "git",
-    "url": "https://fcli.dev"
+    "url": "git+https://github.com/kensand/fcli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kensand/fcli/issues"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
@@ -41,8 +44,5 @@
     "tsx": "^4.0.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"
-  },
-  "dependencies": {
-    "@fcli.dev/f": "^0.0.0-stage"
   }
 }
